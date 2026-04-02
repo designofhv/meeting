@@ -202,7 +202,7 @@ body {
   padding-top: 5px;
   opacity: 0.5;
 }
-.divline { text-align: center; font-size: 11px; color: #222250; padding: 2px 0; font-family: var(--mono); }
+.divline { text-align: center; font-size: 11px; color: #2a2a60; padding: 4px 0; font-family: var(--mono); letter-spacing: 0.05em; }
 
 /* ── CAPTION BOX ── */
 .cap-box {
@@ -390,6 +390,18 @@ body {
 </head>
 <body>
 
+<!-- API KEY SETUP SCREEN -->
+<div id="setup-screen" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#07070f;z-index:999;align-items:center;justify-content:center;flex-direction:column;padding:30px;">
+  <div style="max-width:420px;width:100%;background:#0d0d1c;border:1px solid #2a2a4a;border-radius:16px;padding:30px;">
+    <div style="font-size:22px;font-weight:600;color:#c8c8e8;margin-bottom:8px;">Meeting Assistant</div>
+    <div style="font-size:13px;color:#5050a0;margin-bottom:24px;font-family:IBM Plex Mono,monospace;">Enter your Anthropic API key to start</div>
+    <div style="font-size:12px;color:#4040a0;margin-bottom:8px;">Get your key from console.anthropic.com — it starts with sk-ant-</div>
+    <input id="key-input" type="password" placeholder="sk-ant-..." style="width:100%;background:#11112a;border:1px solid #2a2a4a;border-radius:8px;padding:12px 14px;font-size:13px;color:#c8c8e8;font-family:IBM Plex Mono,monospace;outline:none;margin-bottom:12px;" onkeydown="if(event.key===Enter)saveKey()"/>
+    <div style="font-size:11px;color:#303060;margin-bottom:16px;">Your key is saved only in your browser. It is never sent anywhere except Anthropic directly.</div>
+    <button onclick="saveKey()" style="width:100%;padding:12px;background:#3a7be0;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">Start Meeting Assistant</button>
+  </div>
+</div>
+
 <!-- TOP BAR -->
 <div class="topbar">
   <div class="brand">
@@ -398,6 +410,7 @@ body {
   </div>
   <div class="topright">
     <div class="pill pill-off" id="status-pill">Idle</div>
+    <button onclick="changeKey()" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #2a2a4a;background:transparent;color:#404080;cursor:pointer;font-family:IBM Plex Mono,monospace;">Change Key</button>
   </div>
 </div>
 
@@ -469,10 +482,29 @@ body {
 </div>
 
 <script>
-// ── CONFIG: Paste your Anthropic API key below ──
-// Get it from: https://console.anthropic.com/
-const API_KEY = "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";
-// ────────────────────────────────────────────────
+let API_KEY = localStorage.getItem('mtg_api_key') || '';
+
+function saveKey() {
+  const k = document.getElementById('key-input').value.trim();
+  if (!k || !k.startsWith('sk-')) { alert('Please enter a valid Anthropic API key. It starts with sk-ant-'); return; }
+  API_KEY = k;
+  localStorage.setItem('mtg_api_key', k);
+  document.getElementById('setup-screen').style.display = 'none';
+}
+
+function changeKey() {
+  localStorage.removeItem('mtg_api_key');
+  API_KEY = '';
+  document.getElementById('key-input').value = '';
+  document.getElementById('setup-screen').style.display = 'flex';
+}
+
+// Show setup screen if no key saved
+window.addEventListener('load', () => {
+  if (!API_KEY || !API_KEY.startsWith('sk-')) {
+    document.getElementById('setup-screen').style.display = 'flex';
+  }
+});
 
 const STEPS = [
   { title:"Welcome — open this 5 minutes before your meeting", text:'Keep this tab open alongside your Zoom or Google Meet window. Click each tab above to read instructions step by step. Use <strong>Simulate client</strong> to practice before a real meeting.' },
@@ -640,9 +672,11 @@ async function processClient(msg) {
   }
 
   buildChips(msg);
-  setStatus('Reply ready', 'ready');
+  setStatus('Reply ready — read it out loud!', 'ready');
   showStep(3);
-  isProcessing = false;
+  // NOTE: isProcessing stays TRUE here intentionally
+  // It gets reset to false only when user clicks "I said this" or "Skip"
+  // This prevents double-processing the same question
 }
 
 // ── AI REPLY ──
@@ -680,7 +714,7 @@ Reply (in English): "${currentReply || 'Reply not yet generated'}"`;
 async function callClaude(messages) {
   try {
     const headers = { 'Content-Type': 'application/json' };
-    if (API_KEY && API_KEY !== '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') {
+    if (API_KEY && API_KEY.startsWith('sk-')) {
       headers['x-api-key'] = API_KEY;
       headers['anthropic-version'] = '2023-06-01';
     }
@@ -736,7 +770,8 @@ function useReply() {
   const capTxt = document.getElementById('cap-words').textContent;
   const capTransTxt = document.getElementById('cap-trans-text').textContent;
 
-  if (capTxt && capTxt !== 'Waiting...') {
+  // Save client message to history
+  if (capTxt && capTxt !== 'Waiting...' && capTxt !== '') {
     const ci = document.createElement('div');
     ci.className = 'hitem client';
     ci.innerHTML = `<div class="hlabel">Client said</div>${capTxt}` +
@@ -745,6 +780,7 @@ function useReply() {
     history.push({ r:'client', t: capTxt });
   }
 
+  // Save your reply to history
   const repTransTxt = document.getElementById('rep-trans-text').textContent;
   const yi = document.createElement('div');
   yi.className = 'hitem you';
@@ -753,25 +789,46 @@ function useReply() {
   h.appendChild(yi);
   history.push({ r:'you', t: currentReply });
 
+  // Add turn divider
   const dl = document.createElement('div');
   dl.className = 'divline';
-  dl.textContent = '— — —';
+  dl.textContent = `— Turn ${Math.floor(history.length/2)} done — waiting for next question —`;
   h.appendChild(dl);
-  h.scrollTop = h.scrollHeight;
 
-  document.getElementById('cap-words').textContent = isListening ? '' : 'Waiting...';
+  // Auto scroll history to bottom
+  const main = document.getElementById('main');
+  main.scrollTop = main.scrollHeight;
+
+  // Reset caption area — ready for NEXT client question
+  document.getElementById('cap-words').textContent = isListening ? '🎙 Listening for next question...' : 'Ready — type or speak the next client question';
   document.getElementById('cap-trans').classList.remove('show');
+  document.getElementById('cap-trans-text').textContent = '';
+
+  // Hide reply box — ready for next round
   document.getElementById('rep-box').style.display = 'none';
   document.getElementById('rep-trans').classList.remove('show');
   document.getElementById('rep-trans-text').textContent = '';
-  document.getElementById('cap-trans-text').textContent = '';
+  document.getElementById('chips').innerHTML = '';
+
+  // Clear state for next round
   currentReply = '';
-  setStatus(isListening ? 'Listening...' : 'Idle', isListening ? 'live' : 'off');
-  showStep(isListening ? 1 : 0);
+  isProcessing = false; // IMPORTANT: unlock so next question can be processed
+
+  setStatus(isListening ? 'Listening...' : 'Ready for next', isListening ? 'live' : 'ready');
+  showStep(isListening ? 1 : 4);
+
+  // Focus input for easy typing of next question
+  if (!isListening) document.getElementById('txt-input').focus();
 }
 
 function skipReply() {
   document.getElementById('rep-box').style.display = 'none';
+  document.getElementById('rep-trans').classList.remove('show');
+  document.getElementById('chips').innerHTML = '';
+  currentReply = '';
+  isProcessing = false;
+  document.getElementById('cap-words').textContent = isListening ? '🎙 Listening for next question...' : 'Ready — type the next client question';
+  setStatus(isListening ? 'Listening...' : 'Ready', isListening ? 'live' : 'ready');
   document.getElementById('txt-input').focus();
 }
 
