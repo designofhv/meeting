@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Meeting Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #07070f;
+  --bg2: #0d0d1c;
+  --bg3: #11112a;
+  --border: #1e1e3a;
+  --border2: #2a2a4a;
+  --text: #c8c8e8;
+  --muted: #5050a0;
+  --blue: #3a7be0;
+  --blue-dim: #1a2a4a;
+  --green: #1db97a;
+  --green-dim: #0a1e14;
+  --purple: #7c4dff;
+  --purple-dim: #1a0a3a;
+  --amber: #f0a000;
+  --amber-dim: #1e1400;
+  --red: #e24b4a;
+  --red-dim: #1e0a0a;
+  --font: 'Sora', sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #a0a0d0;
+  letter-spacing: 0.02em;
+}
+
+.recdot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: #333;
+  transition: background 0.4s;
+}
+.recdot.on { background: var(--red); animation: blink 1.2s infinite; }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+.topright { display: flex; gap: 8px; align-items: center; }
+
+.pill {
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid;
+  font-family: var(--mono);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.pill-off { background: var(--bg3); color: var(--muted); border-color: var(--border2); }
+.pill-live { background: var(--red-dim); color: var(--red); border-color: #e24b4a40; }
+.pill-think { background: var(--blue-dim); color: var(--blue); border-color: #3a7be040; }
+.pill-ready { background: var(--green-dim); color: var(--green); border-color: #1db97a40; }
+
+/* ── GUIDE TABS ── */
+.guide-tabs {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.guide-tabs::-webkit-scrollbar { display: none; }
+
+.gtab {
+  font-size: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all 0.15s;
+  font-weight: 500;
+}
+.gtab:hover { color: #8080c0; }
+.gtab.active { color: var(--blue); border-bottom-color: var(--blue); }
+.gtab.done { color: var(--green); }
+
+/* ── GUIDE PANEL ── */
+.guide-panel {
+  background: linear-gradient(135deg, #0a0a1e 0%, #0d0d20 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 20px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: #7070a0;
+}
+.guide-panel .gtitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  margin-bottom: 5px;
+  font-family: var(--mono);
+}
+.guide-panel strong { color: #b0b0e0; font-weight: 600; }
+.guide-panel em { color: #5050a0; font-style: normal; font-family: var(--mono); font-size: 12px; }
+
+/* ── LANG TOGGLE ── */
+.lang-toggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 20px;
+}
+.lang-label { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-right: 4px; }
+.lang-btn {
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--mono);
+  transition: all 0.15s;
+}
+.lang-btn.active { background: var(--purple-dim); color: #b080ff; border-color: #7c4dff50; }
+
+/* ── MAIN AREA ── */
+.main {
+  flex: 1;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  max-height: calc(100vh - 320px);
+}
+
+/* ── HISTORY ── */
+.history { display: flex; flex-direction: column; gap: 8px; }
+
+.hitem {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.hitem.client {
+  background: #0c0c22;
+  border-left: 2px solid var(--blue);
+  color: #8888c0;
+}
+.hitem.you {
+  background: var(--green-dim);
+  border-left: 2px solid var(--green);
+  color: #60b080;
+}
+.hitem .hlabel {
+  font-size: 10px;
+  font-family: var(--mono);
+  opacity: 0.5;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.hitem .htrans {
+  font-size: 11px;
+  margin-top: 5px;
+  opacity: 0.6;
+  font-family: var(--mono);
+  border-top: 1px solid currentColor;
+  padding-top: 5px;
+  opacity: 0.5;
+}
+.divline { text-align: center; font-size: 11px; color: #222250; padding: 2px 0; font-family: var(--mono); }
+
+/* ── CAPTION BOX ── */
+.cap-box {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.cap-box .boxlabel {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.avatar {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--blue-dim);
+  border: 1px solid var(--blue);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px; color: var(--blue); font-weight: 600;
+}
+.avatar.you { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+
+.cap-main {
+  font-size: 17px;
+  color: #d8d8f8;
+  line-height: 1.65;
+  min-height: 28px;
+  font-weight: 300;
+}
+.cursor {
+  display: inline-block;
+  width: 2px; height: 18px;
+  background: var(--blue);
+  margin-left: 3px;
+  vertical-align: middle;
+  animation: blink 0.8s infinite;
+}
+.cap-trans {
+  font-size: 13px;
+  color: #8060c0;
+  margin-top: 8px;
+  font-family: var(--mono);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  display: none;
+  line-height: 1.7;
+}
+.cap-trans.show { display: block; }
+.cap-trans .tlang { font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+
+/* ── REPLY BOX ── */
+.rep-box {
+  background: var(--green-dim);
+  border: 1px solid #1db97a30;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: none;
+}
+.rep-box .boxlabel { font-size: 11px; color: var(--green); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+.rep-main { font-size: 16px; color: #9FE1CB; line-height: 1.75; font-style: italic; min-height: 48px; }
+.rep-trans { font-size: 13px; color: #408060; margin-top: 8px; border-top: 1px solid #1db97a20; padding-top: 8px; font-family: var(--mono); display: none; line-height: 1.7; }
+.rep-trans.show { display: block; }
+.rep-trans .tlang { font-size: 10px; color: #306050; margin-bottom: 3px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip {
+  font-size: 12px; padding: 5px 12px; border-radius: 20px;
+  background: #0a1a10; border: 1px solid #1db97a30;
+  color: #50a070; cursor: pointer; transition: all 0.15s;
+  font-family: var(--mono);
+}
+.chip:hover { background: #0f2518; border-color: #1db97a60; color: #70c090; }
+
+.abtn-row { display: flex; gap: 8px; margin-top: 12px; }
+.abtn {
+  flex: 1; padding: 9px 12px; border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1px solid; transition: all 0.15s;
+  font-family: var(--font);
+}
+.abtn-use { background: #0d3020; border-color: #1db97a; color: #9FE1CB; }
+.abtn-use:hover { background: #114028; }
+.abtn-skip { background: transparent; border-color: var(--border2); color: var(--muted); }
+.abtn-skip:hover { background: var(--bg3); color: #8080b0; }
+
+/* ── BOTTOM BAR ── */
+.bottombar {
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mic-btn {
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #7c4dff50;
+  background: var(--purple-dim);
+  color: #b080ff;
+  font-family: var(--mono);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.mic-btn.on {
+  background: var(--red-dim);
+  border-color: #e24b4a80;
+  color: var(--red);
+  animation: micpulse 1.5s infinite;
+}
+@keyframes micpulse { 0%,100%{ border-color:#e24b4a40; } 50%{ border-color:#e24b4a; } }
+
+.demo-btn {
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.demo-btn:hover { background: var(--bg3); color: #8080c0; }
+
+#txt-input {
+  flex: 1;
+  min-width: 180px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: var(--font);
+  outline: none;
+}
+#txt-input:focus { border-color: #3a7be060; }
+#txt-input::placeholder { color: #30305a; }
+
+.send-btn {
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: var(--blue);
+  color: #fff;
+  font-family: var(--font);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.send-btn:hover { background: #4a8bf0; }
+
+/* ── MISC ── */
+.empty-state {
+  text-align: center;
+  padding: 30px 20px;
+  color: #30305a;
+  font-size: 13px;
+  font-family: var(--mono);
+}
+.empty-state .big { font-size: 28px; margin-bottom: 10px; opacity: 0.3; }
+
+@media (max-width: 500px) {
+  .bottombar { gap: 6px; }
+  .cap-main { font-size: 15px; }
+  .rep-main { font-size: 14px; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="recdot" id="recdot"></div>
+    Meeting Assistant
+  </div>
+  <div class="topright">
+    <div class="pill pill-off" id="status-pill">Idle</div>
+  </div>
+</div>
+
+<!-- GUIDE TABS -->
+<div class="guide-tabs">
+  <div class="gtab active" id="gt0" onclick="showStep(0)">1. Start</div>
+  <div class="gtab" id="gt1" onclick="showStep(1)">2. Microphone</div>
+  <div class="gtab" id="gt2" onclick="showStep(2)">3. Captions</div>
+  <div class="gtab" id="gt3" onclick="showStep(3)">4. AI Reply</div>
+  <div class="gtab" id="gt4" onclick="showStep(4)">5. Type Mode</div>
+  <div class="gtab" id="gt5" onclick="showStep(5)">Tips</div>
+</div>
+
+<!-- GUIDE PANEL -->
+<div class="guide-panel">
+  <div class="gtitle" id="gtitle">Welcome — open this 5 minutes before your meeting</div>
+  <div id="gtext">Keep this tab open alongside your Zoom or Google Meet window. Click each tab above to read the instructions one step at a time. Use <strong>Simulate client</strong> to practice before a real meeting.</div>
+</div>
+
+<!-- LANG TOGGLE -->
+<div class="lang-toggle">
+  <span class="lang-label">Show translation:</span>
+  <button class="lang-btn active" id="lb-hi" onclick="setLang('hi')">Hindi</button>
+  <button class="lang-btn" id="lb-gu" onclick="setLang('gu')">Gujarati</button>
+  <button class="lang-btn" id="lb-off" onclick="setLang('off')">Off</button>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="main">
+  <div class="history" id="history">
+    <div class="empty-state" id="empty">
+      <div class="big">🎙</div>
+      Click <strong>Mic ON</strong> below or press <strong>Simulate client</strong> to begin
+    </div>
+  </div>
+
+  <div class="cap-box" id="cap-box">
+    <div class="boxlabel"><div class="avatar">CL</div> Client is saying...</div>
+    <div class="cap-main">
+      <span id="cap-words">Waiting...</span><span class="cursor" id="cur" style="display:none"></span>
+    </div>
+    <div class="cap-trans" id="cap-trans">
+      <div class="tlang" id="cap-trans-lang">Hindi:</div>
+      <div id="cap-trans-text"></div>
+    </div>
+  </div>
+
+  <div class="rep-box" id="rep-box">
+    <div class="boxlabel">✦ Your suggested reply — read this out loud</div>
+    <div class="rep-main" id="rep-text"></div>
+    <div class="rep-trans" id="rep-trans">
+      <div class="tlang" id="rep-trans-lang">Hindi meaning:</div>
+      <div id="rep-trans-text"></div>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="abtn-row">
+      <button class="abtn abtn-use" onclick="useReply()">I said this — continue</button>
+      <button class="abtn abtn-skip" onclick="skipReply()">Skip / type own</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM BAR -->
+<div class="bottombar">
+  <button class="mic-btn" id="mic-btn" onclick="toggleMic()">🎙 Mic ON</button>
+  <button class="demo-btn" onclick="runDemo()">Simulate client</button>
+  <input id="txt-input" placeholder="Type what client said, then press Enter..." onkeydown="if(event.key==='Enter')sendTyped()"/>
+  <button class="send-btn" onclick="sendTyped()">Send</button>
+</div>
+
+<script>
+// ── CONFIG: Paste your Anthropic API key below ──
+// Get it from: https://console.anthropic.com/
+const API_KEY = "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";
+// ────────────────────────────────────────────────
+
+const STEPS = [
+  { title:"Welcome — open this 5 minutes before your meeting", text:'Keep this tab open alongside your Zoom or Google Meet window. Click each tab above to read instructions step by step. Use <strong>Simulate client</strong> to practice before a real meeting.' },
+  { title:"Step 2 — Turn on your microphone", text:'Click the purple <strong>Mic ON</strong> button at the bottom. Your browser will ask for microphone permission — click <strong>Allow</strong>. Once allowed, the dot at the top turns red and it starts listening. Speak to test: your words appear as live captions. <em>Use Chrome or Edge for best results.</em>' },
+  { title:"Step 3 — Live captions appear automatically", text:"When your client speaks in the meeting, their words appear here as <strong>live subtitles</strong> — letter by letter, just like TV captions. Below the caption you'll see the <strong>Hindi or Gujarati translation</strong> so you understand exactly what they said." },
+  { title:"Step 4 — Read the green AI reply out loud", text:'After the client finishes speaking, the AI automatically writes the <strong>best professional reply</strong> for you in the green box. Read it out loud in your meeting — it sounds natural and confident. When done, click <strong>"I said this — continue"</strong> to save and move on.' },
+  { title:"Step 5 — If microphone does not work, use type mode", text:"Some browsers or systems block the microphone. No problem — listen to the client, then type what they said into the bottom input box and press <strong>Enter</strong>. The AI reply still appears instantly. Also works great for text-based messages in chat." },
+  { title:"Tips for best results", text:"<strong>Practice first:</strong> Click 'Simulate client' 4–5 times before your meeting to get comfortable. <strong>Quick chips:</strong> Tap the small buttons below the reply for short one-liner responses. <strong>Translation:</strong> Toggle Hindi / Gujarati / Off using the buttons above. The AI remembers the whole conversation so replies always fit the context." }
+];
+
+const DEMOS = [
+  "Hi, can you please introduce yourself and tell me what your company does?",
+  "We are looking for a long-term vendor partner. What experience do you have with enterprise clients?",
+  "What is your pricing model and how flexible are you on contract terms?",
+  "Can you walk me through the onboarding process and how long it typically takes?",
+  "What makes you different from your competitors in this market?",
+  "Do you have any case studies or client references we could look at?",
+  "What kind of after-sales support do you provide?",
+  "Can you give me a rough timeline for delivery if we move forward today?"
+];
+
+let history = [], currentReply = "", isProcessing = false, demoIdx = 0;
+let recognition = null, isListening = false, silenceTimer = null, interim = "";
+let lang = "hi";
+
+// ── STEP GUIDE ──
+function showStep(i) {
+  document.querySelectorAll('.gtab').forEach((t,j) => {
+    t.className = 'gtab' + (j < i ? ' done' : j === i ? ' active' : '');
+  });
+  document.getElementById('gtitle').textContent = STEPS[i].title;
+  document.getElementById('gtext').innerHTML = STEPS[i].text;
+}
+
+// ── LANG ──
+function setLang(l) {
+  lang = l;
+  ['hi','gu','off'].forEach(x => {
+    document.getElementById('lb-'+x).className = 'lang-btn' + (x===l?' active':'');
+  });
+  const show = l !== 'off';
+  const capTrans = document.getElementById('cap-trans');
+  const repTrans = document.getElementById('rep-trans');
+  if (!show) { capTrans.classList.remove('show'); repTrans.classList.remove('show'); }
+}
+
+// ── STATUS ──
+function setStatus(txt, type) {
+  const p = document.getElementById('status-pill');
+  p.textContent = txt;
+  p.className = 'pill pill-' + (type || 'off');
+}
+function setRec(on) { document.getElementById('recdot').className = 'recdot' + (on ? ' on' : ''); }
+
+// ── MIC ──
+function toggleMic() { isListening ? stopMic() : startMic(); }
+
+function startMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    document.getElementById('cap-words').textContent = 'Microphone not supported. Please use Chrome or Edge. Use the type box below instead.';
+    setStatus('No mic', 'live');
+    return;
+  }
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onstart = () => {
+    isListening = true;
+    setRec(true);
+    setStatus('Listening...', 'live');
+    document.getElementById('mic-btn').textContent = '⏹ Stop Mic';
+    document.getElementById('mic-btn').className = 'mic-btn on';
+    document.getElementById('cap-words').textContent = '';
+    document.getElementById('cur').style.display = 'inline-block';
+    document.getElementById('empty').style.display = 'none';
+    showStep(1);
+  };
+
+  recognition.onresult = (e) => {
+    let fin = '', int2 = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) fin += e.results[i][0].transcript;
+      else int2 += e.results[i][0].transcript;
+    }
+    document.getElementById('cap-words').textContent = (interim + fin + int2).trim();
+    if (fin) {
+      interim += fin;
+      clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => {
+        const msg = interim.trim();
+        if (msg.length > 4) { interim = ''; processClient(msg); }
+      }, 1800);
+    }
+  };
+
+  recognition.onerror = (e) => { if (e.error !== 'no-speech') stopMic(); };
+  recognition.onend = () => { if (isListening) recognition.start(); };
+  recognition.start();
+}
+
+function stopMic() {
+  isListening = false;
+  if (recognition) { recognition.onend = null; recognition.stop(); }
+  setRec(false);
+  setStatus('Idle', 'off');
+  document.getElementById('mic-btn').textContent = '🎙 Mic ON';
+  document.getElementById('mic-btn').className = 'mic-btn';
+  document.getElementById('cur').style.display = 'none';
+}
+
+// ── TYPE TEXT ANIMATION ──
+async function typeEl(el, text, spd) {
+  el.textContent = '';
+  for (let c of text) { el.textContent += c; await sleep(spd || 18); }
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ── PROCESS CLIENT MESSAGE ──
+async function processClient(msg) {
+  if (isProcessing) return;
+  isProcessing = true;
+  showStep(2);
+
+  const capWords = document.getElementById('cap-words');
+  const cur = document.getElementById('cur');
+  cur.style.display = 'inline-block';
+  await typeEl(capWords, msg, 22);
+  cur.style.display = 'none';
+
+  document.getElementById('cap-trans').classList.remove('show');
+
+  const repBox = document.getElementById('rep-box');
+  const repText = document.getElementById('rep-text');
+  repBox.style.display = 'block';
+  repText.textContent = 'AI is thinking...';
+  repText.style.opacity = '0.4';
+  setStatus('AI thinking...', 'think');
+
+  const [aiReply, translation] = await Promise.all([
+    getAIReply(msg),
+    lang !== 'off' ? getTranslation(msg, lang) : Promise.resolve(null)
+  ]);
+
+  // Show client translation
+  if (translation && translation.clientTrans && lang !== 'off') {
+    const ct = document.getElementById('cap-trans');
+    document.getElementById('cap-trans-lang').textContent = lang === 'hi' ? 'Hindi meaning:' : 'Gujarati meaning:';
+    document.getElementById('cap-trans-text').textContent = translation.clientTrans;
+    ct.classList.add('show');
+  }
+
+  currentReply = aiReply;
+  repText.style.opacity = '1';
+  await typeEl(repText, aiReply, 16);
+
+  // Show reply translation
+  if (translation && translation.replyTrans && lang !== 'off') {
+    const rt = document.getElementById('rep-trans');
+    document.getElementById('rep-trans-lang').textContent = lang === 'hi' ? 'Hindi meaning:' : 'Gujarati meaning:';
+    document.getElementById('rep-trans-text').textContent = translation.replyTrans;
+    rt.classList.add('show');
+  }
+
+  buildChips(msg);
+  setStatus('Reply ready', 'ready');
+  showStep(3);
+  isProcessing = false;
+}
+
+// ── AI REPLY ──
+async function getAIReply(msg) {
+  const sys = `You are a real-time meeting assistant helping a non-native English speaker respond professionally in a business video call (Zoom/Google Meet).
+
+Conversation so far:
+${history.map(m => (m.r === 'client' ? 'Client' : 'You') + ': ' + m.t).join('\n')}
+
+Client just said: "${msg}"
+
+Write a clear, professional, natural reply they can say out loud. 2-3 sentences max. Sound warm and confident. End with a follow-up question or open statement to keep the conversation going. Reply ONLY with the spoken response — no labels, no quotes, no explanation.`;
+
+  return await callClaude([{ role:'user', content: sys }]) || fallback(msg);
+}
+
+// ── TRANSLATION ──
+async function getTranslation(clientMsg, targetLang) {
+  const langName = targetLang === 'hi' ? 'Hindi' : 'Gujarati';
+  const sys = `Translate the following into ${langName}. Reply ONLY with a JSON object like:
+{"clientTrans":"...","replyTrans":"..."}
+No explanation, no markdown. Just the JSON.
+
+Client said (in English): "${clientMsg}"
+Reply (in English): "${currentReply || 'Reply not yet generated'}"`;
+
+  try {
+    const raw = await callClaude([{ role:'user', content: sys }]);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    return JSON.parse(clean);
+  } catch(e) { return null; }
+}
+
+// ── CALL CLAUDE ──
+async function callClaude(messages) {
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (API_KEY && API_KEY !== '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') {
+      headers['x-api-key'] = API_KEY;
+      headers['anthropic-version'] = '2023-06-01';
+    }
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:800, messages })
+    });
+    const data = await res.json();
+    return data.content?.map(b => b.text || '').join('').trim() || null;
+  } catch(e) { return null; }
+}
+
+// ── FALLBACK (no API key) ──
+function fallback(msg) {
+  const m = msg.toLowerCase();
+  if (m.includes('introduc') || m.includes('company')) return "Of course! My name is [Your Name] and I represent [Your Company]. We specialize in providing tailored solutions to help businesses grow efficiently. I am really looking forward to understanding your specific needs today.";
+  if (m.includes('price') || m.includes('cost') || m.includes('budget')) return "Our pricing is flexible and designed to match your specific requirements. We offer monthly, quarterly, and annual plans. Could you share more about your expected scale so I can give you a more accurate proposal?";
+  if (m.includes('onboard') || m.includes('time') || m.includes('how long')) return "Our onboarding process is very structured and typically takes two to four weeks. We assign a dedicated manager to guide your team every step of the way. Most clients are fully operational within the first month.";
+  if (m.includes('different') || m.includes('competitor')) return "What sets us apart is our personalized approach and commitment to long-term partnership. We do not just deliver a product — we stay with you through every stage. I would love to share some specific examples of how we have helped similar companies.";
+  if (m.includes('support') || m.includes('team')) return "We provide dedicated support with a named account manager for each client. Our team is available throughout business hours and we have documentation and training included. You will never feel stuck after signing with us.";
+  return "That is a very important point, and I appreciate you raising it. Let me give you a clear and honest answer on that. Could you tell me a bit more about your specific situation so I can tailor my response?";
+}
+
+// ── CHIPS ──
+function buildChips(msg) {
+  const m = msg.toLowerCase();
+  let chips = [];
+  if (m.includes('price') || m.includes('cost')) chips = ["We can customize pricing", "Annual plan saves more", "Happy to negotiate"];
+  else if (m.includes('time') || m.includes('onboard') || m.includes('when')) chips = ["Usually 2-4 weeks", "Timeline is flexible", "Let me check and confirm"];
+  else if (m.includes('support') || m.includes('team') || m.includes('help')) chips = ["Dedicated support included", "24/7 available", "Our team is experienced"];
+  else if (m.includes('different') || m.includes('compet')) chips = ["We focus on long-term value", "Happy to share a comparison", "Our approach is personalized"];
+  else if (m.includes('case') || m.includes('reference') || m.includes('example')) chips = ["Yes, happy to share case studies", "Can connect you with a client", "I will send details after the call"];
+  else chips = ["Can you tell me more?", "Great question — let me explain", "Happy to elaborate on that"];
+
+  const c = document.getElementById('chips');
+  c.innerHTML = '';
+  chips.forEach(ch => {
+    const el = document.createElement('div');
+    el.className = 'chip';
+    el.textContent = ch;
+    el.onclick = () => { currentReply = ch; document.getElementById('rep-text').textContent = ch; };
+    c.appendChild(el);
+  });
+}
+
+// ── USE / SKIP ──
+function useReply() {
+  if (!currentReply) return;
+  const h = document.getElementById('history');
+  document.getElementById('empty').style.display = 'none';
+
+  const capTxt = document.getElementById('cap-words').textContent;
+  const capTransTxt = document.getElementById('cap-trans-text').textContent;
+
+  if (capTxt && capTxt !== 'Waiting...') {
+    const ci = document.createElement('div');
+    ci.className = 'hitem client';
+    ci.innerHTML = `<div class="hlabel">Client said</div>${capTxt}` +
+      (capTransTxt && lang !== 'off' ? `<div class="htrans">${lang === 'hi' ? 'Hindi' : 'Gujarati'}: ${capTransTxt}</div>` : '');
+    h.appendChild(ci);
+    history.push({ r:'client', t: capTxt });
+  }
+
+  const repTransTxt = document.getElementById('rep-trans-text').textContent;
+  const yi = document.createElement('div');
+  yi.className = 'hitem you';
+  yi.innerHTML = `<div class="hlabel">You replied</div>${currentReply}` +
+    (repTransTxt && lang !== 'off' ? `<div class="htrans">${lang === 'hi' ? 'Hindi' : 'Gujarati'}: ${repTransTxt}</div>` : '');
+  h.appendChild(yi);
+  history.push({ r:'you', t: currentReply });
+
+  const dl = document.createElement('div');
+  dl.className = 'divline';
+  dl.textContent = '— — —';
+  h.appendChild(dl);
+  h.scrollTop = h.scrollHeight;
+
+  document.getElementById('cap-words').textContent = isListening ? '' : 'Waiting...';
+  document.getElementById('cap-trans').classList.remove('show');
+  document.getElementById('rep-box').style.display = 'none';
+  document.getElementById('rep-trans').classList.remove('show');
+  document.getElementById('rep-trans-text').textContent = '';
+  document.getElementById('cap-trans-text').textContent = '';
+  currentReply = '';
+  setStatus(isListening ? 'Listening...' : 'Idle', isListening ? 'live' : 'off');
+  showStep(isListening ? 1 : 0);
+}
+
+function skipReply() {
+  document.getElementById('rep-box').style.display = 'none';
+  document.getElementById('txt-input').focus();
+}
+
+// ── TYPE INPUT ──
+function sendTyped() {
+  const inp = document.getElementById('txt-input');
+  const msg = inp.value.trim();
+  if (!msg || isProcessing) return;
+  inp.value = '';
+  document.getElementById('empty').style.display = 'none';
+  processClient(msg);
+}
+
+// ── DEMO ──
+function runDemo() {
+  if (isProcessing) return;
+  document.getElementById('empty').style.display = 'none';
+  processClient(DEMOS[demoIdx % DEMOS.length]);
+  demoIdx++;
+}
+</script>
+</body>
+</html>
